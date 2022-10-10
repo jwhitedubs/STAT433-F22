@@ -1,7 +1,9 @@
-Homework1_Stat433_JakeWhite
+Homework2_Stat433
 ================
 Jake White
-2022-09-26
+2022-10-10
+
+## I have found that flights that depart within the late night/early morning time gap seem to have the least amount of delays. That being said, these are the most optimal times to avoid delays. I wanted to check on if this choice depended on seasonal changes, destinations per flight, or the distance of the flight itself. The seasonal table seemed to show a stagnant number of delays (or lack thereof) throughout all seasons. This could be due to the mild and consistent weather that is found at night through most seasons. When checking for destinations, the Charlotte Airport showed a substantial amount of delays during the night time. Therefore, if you’re flying at night to avoid delays, also try to avoid flying into Charlotte. The last pattern I attempted to look into was flight distance. A significant outlier presented itself as a flight distance of 529 feet showed a staggering 303 delays. Unsure if this is a data anomaly or possibly an error in the table, this number should be taken with caution nonetheless. I was under the initial assumption that longer flights would show a greater number of delays regardless of departure time, but the data seems to show otherwise.
 
 ``` r
 library(dplyr)
@@ -21,79 +23,109 @@ library(dplyr)
 ``` r
 library(nycflights13)
 library(ggplot2)
+library(tidyr)
 ```
-
-\#Q1
 
 ``` r
-q1 <- filter(flights, is.na(dep_time))
-q1
+flights %>%
+    ggplot(aes(x=factor(hour), fill=arr_delay>6 | is.na(arr_delay))) + geom_bar(color="black") + xlab("Hour of the Day") + ylab("Count") 
 ```
 
-    ## # A tibble: 8,255 × 19
-    ##     year month   day dep_time sched_dep_time dep_delay arr_time sched_arr_time
-    ##    <int> <int> <int>    <int>          <int>     <dbl>    <int>          <int>
-    ##  1  2013     1     1       NA           1630        NA       NA           1815
-    ##  2  2013     1     1       NA           1935        NA       NA           2240
-    ##  3  2013     1     1       NA           1500        NA       NA           1825
-    ##  4  2013     1     1       NA            600        NA       NA            901
-    ##  5  2013     1     2       NA           1540        NA       NA           1747
-    ##  6  2013     1     2       NA           1620        NA       NA           1746
-    ##  7  2013     1     2       NA           1355        NA       NA           1459
-    ##  8  2013     1     2       NA           1420        NA       NA           1644
-    ##  9  2013     1     2       NA           1321        NA       NA           1536
-    ## 10  2013     1     2       NA           1545        NA       NA           1910
-    ## # … with 8,245 more rows, and 11 more variables: arr_delay <dbl>,
-    ## #   carrier <chr>, flight <int>, tailnum <chr>, origin <chr>, dest <chr>,
-    ## #   air_time <dbl>, distance <dbl>, hour <dbl>, minute <dbl>, time_hour <dttm>
+![](README_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
 
-# The other rows that are missing from this other than dep_time are dep_delay, arr_time, arr_delay, and air_time. This could be a sign that these flights were cancelled but still tracked as part of the data.
+## It seems as though the evening flights (Hours 15-19) are typically the flights to avoid when trying to avoid delays.The early morning/very late night times are the best times to fly to avoid delays.
 
-\#Q2
+\#Checking if this is dependent on season
 
 ``` r
-q2 <- mutate(flights, dep_time = 60 * floor(dep_time/100) + (dep_time - floor(dep_time/100) * 100), sched_dep_time = 60 * floor(sched_dep_time/100) + (sched_dep_time - floor(sched_dep_time/100) * 100))
+seasonal = flights %>% 
+  mutate(time = dep_time) %>% 
+  separate(time, into = c("dep_hour", "dep_min"), sep = -2) %>% 
+  filter(dep_hour == 3) %>% 
+  group_by(month) %>% 
+  summarise(n = n())
 
-q2
+
+ggplot(seasonal, aes(x = month, y = n)) + geom_point() + ylim(0,20)
 ```
 
-    ## # A tibble: 336,776 × 19
-    ##     year month   day dep_time sched_dep_time dep_delay arr_time sched_arr_time
-    ##    <int> <int> <int>    <dbl>          <dbl>     <dbl>    <int>          <int>
-    ##  1  2013     1     1      317            315         2      830            819
-    ##  2  2013     1     1      333            329         4      850            830
-    ##  3  2013     1     1      342            340         2      923            850
-    ##  4  2013     1     1      344            345        -1     1004           1022
-    ##  5  2013     1     1      354            360        -6      812            837
-    ##  6  2013     1     1      354            358        -4      740            728
-    ##  7  2013     1     1      355            360        -5      913            854
-    ##  8  2013     1     1      357            360        -3      709            723
-    ##  9  2013     1     1      357            360        -3      838            846
-    ## 10  2013     1     1      358            360        -2      753            745
-    ## # … with 336,766 more rows, and 11 more variables: arr_delay <dbl>,
-    ## #   carrier <chr>, flight <int>, tailnum <chr>, origin <chr>, dest <chr>,
-    ## #   air_time <dbl>, distance <dbl>, hour <dbl>, minute <dbl>, time_hour <dttm>
+![](README_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
 
-\#Q3
+\#It looks as though this inference does not depend on seasons, as the
+it shows a relatively linear number of delays per seasonal group. The
+consistency of these results may be due to the fact that throughout most
+seasons, the night time weather is typically stagnant (besides winter).
+
+\#Checking if this is dependent on destination
 
 ``` r
-q3 <-flights %>%
-  mutate(dep_date = lubridate::make_datetime(year, month, day)) %>%
-  group_by(dep_date) %>%
-  summarise(cancelled = sum(is.na(dep_delay)), 
-            n = n(),
-            mean_arr_delay = mean(arr_delay,na.rm=TRUE),
-            mean_dep_delay = mean(dep_delay,na.rm=TRUE)) %>%
-    ggplot(aes(x= cancelled/n)) + 
-    geom_point(aes(y=mean_arr_delay), color='green', alpha=0.5) + 
-    geom_point(aes(y=mean_dep_delay), color='orange', alpha=0.5) + 
-    ylab('Average Delay in Minutes') + 
-    xlab('The rate of cancelled flights')
+destinational = flights %>% 
+  mutate(time = dep_time) %>% 
+  separate(time, into = c("dep_hour", "dep_min"), sep = -2) %>% 
+  filter(dep_hour == 4 | dep_hour == 3 | dep_hour == 2) %>% 
+  group_by(dest) %>% 
+  summarise(n = n()) %>%
+  arrange(desc(n))
 
-q3
+destinational
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-5-1.png)<!-- --> \# There does
-not seem to be significant correlation between cancelled flights and the
-delays. It seems that only a select number of flights share a higher
-cancellation rate when the delay time is increased.
+    ## # A tibble: 25 × 2
+    ##    dest      n
+    ##    <chr> <int>
+    ##  1 CLT     303
+    ##  2 BQN      12
+    ##  3 BOS       8
+    ##  4 PSE       7
+    ##  5 SJU       7
+    ##  6 BUF       4
+    ##  7 FLL       4
+    ##  8 LAX       4
+    ##  9 TPA       4
+    ## 10 CAK       3
+    ## # … with 15 more rows
+
+\#The Charlotte Airport appears to be a significant outlier among the
+rest of the destination airports in the data in terms of delays during
+the night time. It’s clear to note that the choice of flying at night is
+relatively dependent on where you are planning to fly to. If Charlotte
+is your desired destination, then flying during these night hours might
+not be your best option.
+
+\#Checking if this is dependent on flight distance
+
+``` r
+distance = flights %>% 
+  mutate(time = dep_time) %>% 
+  separate(time, into = c("dep_hour", "dep_min"), sep = -2) %>% 
+  filter(dep_hour == 4 | dep_hour == 3 | dep_hour == 2) %>% 
+  group_by(distance) %>% 
+  summarise(n = n()) %>%
+  arrange(desc(n))
+
+distance
+```
+
+    ## # A tibble: 29 × 2
+    ##    distance     n
+    ##       <dbl> <int>
+    ##  1      529   303
+    ##  2     1576    12
+    ##  3      187     8
+    ##  4     1598     7
+    ##  5     1617     7
+    ##  6      301     4
+    ##  7      209     3
+    ##  8      397     3
+    ##  9     1005     3
+    ## 10     2475     3
+    ## # … with 19 more rows
+
+\#Providing similar results to the last table, this data shows a
+significant outlier at 529 feet. I was under the assumption that a
+flight with longer distance would provide more delays regardless of
+time. This assumption was made due to my thought that the longer the
+flight the higher chance the flight would have of running into multiple
+different weather packets. If this data is outputting correctly, these
+results are dependent on if you’re fliying at a distance of \~530 feet
+or not.
